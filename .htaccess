@@ -1,0 +1,53 @@
+# DECOR PMM: dedicated OVH multisite document root only.
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+DirectorySlash Off
+ErrorDocument 404 /404.html
+AddDefaultCharset UTF-8
+AddType image/avif .avif
+AddType image/webp .webp
+AddType font/woff2 .woff2
+AddType text/x-component .rsc
+
+RewriteEngine On
+
+# The hosting may deploy this document root from Git. Never serve hidden files.
+# ACME HTTP challenges remain available under /.well-known/.
+RewriteRule (^|/)\.(?!well-known(?:/|$)) - [F,L]
+
+# Both names must already have a valid certificate on this hosting.
+RewriteCond %{HTTPS} !=on [OR]
+RewriteCond %{HTTP_HOST} !^www\.decorpmm\.com$ [NC]
+RewriteRule ^ https://www.decorpmm.com%{REQUEST_URI} [R=301,L,NE]
+
+# Only redirect browser requests for .html, never internal rewrites.
+RewriteCond %{THE_REQUEST} \s/+index\.html(?:[?\s]) [NC]
+RewriteRule ^index\.html$ / [R=301,L,NE]
+RewriteCond %{THE_REQUEST} \s/+[^?\s]+\.html(?:[?\s]) [NC]
+RewriteRule ^(.+)\.html$ /$1 [R=301,L,NE]
+
+# A section such as /proyectos has both proyectos.html and a proyectos/ directory.
+# Resolve the exported HTML BEFORE Apache can redirect to the directory.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+RewriteRule ^(.+)/$ /$1 [R=301,L,NE]
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+)$ $1.html [L]
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  <FilesMatch "\.(html|rsc|xml|txt)$">
+    Header set Cache-Control "public, max-age=0, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.(avif|webp|png|jpe?g|svg|woff2?)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript application/json application/xml text/x-component image/svg+xml
+</IfModule>
